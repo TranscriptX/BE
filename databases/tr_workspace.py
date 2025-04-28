@@ -1,15 +1,18 @@
-from sqlmodel import Field, Relationship
-from timestamp_mixin import TimestampMixin
-from ms_user import MsUser
-from tr_workspace_detail import TrWorkspaceDetail
+from sqlmodel import Field, Relationship, Text
+from databases.timestamp_mixin import TimestampMixin
+# from databases.ms_user import MsUser
+from databases.tr_workspace_detail import TrWorkspaceDetail
 import uuid
 
 class TrWorkspace(TimestampMixin, table = True):
-    workspaceID: uuid.UUID = Field(default_factory = uuid.uuid4, primary_key = True)
-    name: str | None = Field(max_length = 255)
-    description: str | None = Field(sa_column_kwargs = {"type": "TEXT"})
-    userID: str = Field(foreign_key = "MsUser.roleID", max_length = 36)
-    file: str = Field(sa_column_kwargs = {"type": "TEXT"})
+    __tablename__ = "TrWorkspace"  
+    __table_args__ = {"extend_existing": True}
 
-    user: MsUser = Relationship(back_populates = "workspaces")
+    workspaceID: str = Field(primary_key = True, max_length = 36)
+    name: str | None = Field(max_length = 255)
+    description: str | None = Field(sa_column = Text)
+    userID: str = Field(foreign_key = "MsUser.userID", max_length = 36)
+    file: str = Field(sa_column = Text)
+
+    user: "MsUser" = Relationship(back_populates = "workspaces")
     workspaceDetail: list["TrWorkspaceDetail"] = Relationship(back_populates = "workspace")
