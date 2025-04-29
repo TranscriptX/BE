@@ -14,5 +14,5 @@ class TrWorkspaceDetail(TimestampMixin, table = True):
     link: str | None = Field(max_length = 255)
     result: str = Field(sa_column = Text)
 
-    tool: "LtTools" = Relationship(back_populates = "workspaceDetails")
-    workspace: "TrWorkspace" = Relationship(back_populates = "workspaceDetails")
+    tool: "LtTools" = Relationship(back_populates = "workspaceDetail")
+    workspace: "TrWorkspace" = Relationship(back_populates = "workspaceDetail")
