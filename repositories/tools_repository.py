@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from databases.tr_workspace import TrWorkspace
 from databases.tr_workspace_detail import TrWorkspaceDetail
 from models.requests.transcript_request import TranscriptRequest
@@ -115,26 +115,59 @@ class ToolsRepository:
         
     async def summarize(self, request: SummarizeRequest, file_extension):
         try:
-            file_data = request.file.split(",")[-1]
-            file_bytes = get_safe_base64(file_data)
+            if request.workspaceID is not None:
+                text = self.db.exec(
+                    select(TrWorkspaceDetail.result)
+                    .where(TrWorkspaceDetail.workspaceID == request.workspaceID)
+                ).first()
 
-            with tempfile.NamedTemporaryFile(delete = False, suffix = file_extension) as tmp:
-                tmp.write(file_bytes)
-                tmp_path = tmp.name
+                if text is None:
+                    return Response(
+                        statusCode = HTTPStatus.NOT_FOUND,
+                        message = "Workspace ID is not found",
+                        payload = None
+                    )
+                
+                workspace_id = request.workspaceID
+            elif request.file is not None:
+                file_data = request.file.split(",")[-1]
+                file_bytes = get_safe_base64(file_data)
 
-            if file_extension == ".txt":
-                with open(tmp_path, "r", encoding = "utf-8") as f:
-                    text = f.read()
-            elif file_extension == ".pdf":
-                with pdfplumber.open(tmp_path) as f:
-                    text = "\n".join([page.extract_text() for page in f.pages if page.extract_text()])
-            elif file_extension == ".docx":
-                f = Document(tmp_path)
-                text = "\n".join([para.text for para in f.paragraphs])
+                with tempfile.NamedTemporaryFile(delete = False, suffix = file_extension) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+
+                if file_extension == ".txt":
+                    with open(tmp_path, "r", encoding = "utf-8") as f:
+                        text = f.read()
+                elif file_extension == ".pdf":
+                    with pdfplumber.open(tmp_path) as f:
+                        text = "\n".join([page.extract_text() for page in f.pages if page.extract_text()])
+                elif file_extension == ".docx":
+                    f = Document(tmp_path)
+                    text = "\n".join([para.text for para in f.paragraphs])
+                else:
+                    return Response(
+                        statusCode = HTTPStatus.BAD_REQUEST,
+                        message = "File must be in .txt, .docx, or .pdf format.",
+                        payload = None
+                    )
+                
+                workspace_id = str(uuid.uuid4())
+
+                workspace = TrWorkspace(
+                    workspaceID = workspace_id,
+                    name = request.name,
+                    description = request.description,
+                    file = request.file,
+                    userID = request.userID  
+                )
+
+                self.db.add(workspace)
             else:
                 return Response(
                     statusCode = HTTPStatus.BAD_REQUEST,
-                    message = "File must be in .txt, .docx, or .pdf format.",
+                    message = "Invalid model state",
                     payload = None
                 )
 
@@ -164,6 +197,7 @@ class ToolsRepository:
                 with torch.no_grad():
                     summary_ids = self.summarization_model.generate(
                         **inputs,
+                        min_length = 300,
                         max_length = 1500,
                         length_penalty = 2.0,
                         num_beams = 4,
@@ -173,16 +207,6 @@ class ToolsRepository:
             else:
                 summarization = final_text  
 
-            workspace_id = str(uuid.uuid4())
-
-            workspace = TrWorkspace(
-                workspaceID = workspace_id,
-                name = request.name,
-                description = request.description,
-                file = request.file,
-                userID = request.userID  
-            )
-
             workspace_detail = TrWorkspaceDetail(
                 workspaceDetailID = str(uuid.uuid4()),
                 workspaceID = workspace_id,
@@ -191,7 +215,6 @@ class ToolsRepository:
                 result = summarization
             )
 
-            self.db.add(workspace)
             self.db.add(workspace_detail)
             self.db.commit()
 
