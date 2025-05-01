@@ -12,6 +12,7 @@ class TrWorkspace(TimestampMixin, table = True):
     name: str | None = Field(max_length = 255)
     description: str | None = Field(sa_column = Text)
     userID: str = Field(foreign_key = "MsUser.userID", max_length = 36)
+    link: str | None = Field(max_length = 255)
     file: str = Field(sa_column = Text)
 
     user: "MsUser" = Relationship(back_populates = "workspaces")
