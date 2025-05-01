@@ -85,6 +85,3 @@ class ToolsService:
                 message = str(e),
                 payload = None
             )
-        
-    async def share(self, request: ShareRequest):
-        return await self.tools_repository.share(request)
