@@ -9,21 +9,16 @@ from models.responses.summarize_response import SummarizeResult
 from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
 from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
 from http import HTTPStatus
-from utils.get_safe_base64 import get_safe_base64
-import moviepy
+from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
 import pdfplumber
 import uuid
-import asyncio
 import torch
 import torchaudio
-import base64
 import io
 import os
 import tempfile
-import mimetypes
-import traceback
 
 class ToolsRepository:
     def __init__(self, db: Session):
@@ -60,7 +55,7 @@ class ToolsRepository:
             else:
                 return Response(
                     statusCode = HTTPStatus.BAD_REQUEST,
-                    message = "File must be in .wav, .mp3, .mp4, .mpeg format",
+                    message = "File must be in .wav, .mp3, .mp4, .mpeg format.",
                     payload = None
                 )
 
@@ -134,7 +129,7 @@ class ToolsRepository:
             else:
                 return Response(
                     statusCode = HTTPStatus.BAD_REQUEST,
-                    message = "File must be in .txt, .docx, or .pdf format",
+                    message = "File must be in .txt, .docx, or .pdf format.",
                     payload = None
                 )
 

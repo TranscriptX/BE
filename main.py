@@ -4,7 +4,7 @@ from pipelines.transcription_pipeline import model, processor
 from databases.database import create_db_and_tables
 from controllers.tools_controller import router as tools_router
 
-app = FastAPI()
+app = FastAPI(max_request_size = 256 * 1024 * 1024)
 app.include_router(tools_router)
 
 @app.on_event("startup")
