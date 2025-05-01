@@ -8,10 +8,12 @@ from models.responses.transcript_response import TranscriptResult
 from models.responses.summarize_response import SummarizeResult
 from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
 from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
+from pipelines.language_model_pipeline import model as language_model
 from http import HTTPStatus
 from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
+from transformers import BatchEncoding
 import pdfplumber
 import uuid
 import torch
@@ -27,6 +29,8 @@ class ToolsRepository:
         self.transcription_processor = transcription_processor
         self.summarization_model = summarization_model
         self.summarization_tokenizer = summarization_tokenizer
+        self.language_model = language_model
+        self.max_tokens = 1024
 
     async def transcript(self, request: TranscriptRequest, file_extension):
         try:
@@ -71,6 +75,7 @@ class ToolsRepository:
 
             predicted_ids = torch.argmax(logits, dim = -1)
             transcription = self.transcription_processor.batch_decode(predicted_ids)[0]
+            transcription = self.language_model.restore_punctuation(transcription)
             
             workspace_id = str(uuid.uuid4())
 
@@ -133,23 +138,40 @@ class ToolsRepository:
                     payload = None
                 )
 
-            inputs = self.summarization_tokenizer(
-                text, 
-                return_tensors = "pt", 
-                max_length = 1024, 
-                truncation = False
-            )
+            chunk_size = self.max_tokens * 4
+            overlap = chunk_size // 4 
+            step = chunk_size - overlap
+            chunks = [text[i:i + chunk_size] for i in range(0, len(text), step)]
 
-            with torch.no_grad():
-                summary_ids = self.summarization_model.generate(
-                    **inputs,
-                    max_length = 1500,
-                    length_penalty = 2.0,
-                    num_beams = 4,
-                    early_stopping = True
-                )
+            summaries = []
+            for chunk in chunks:
+                inputs = self.summarization_tokenizer(chunk, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+                with torch.no_grad():
+                    summary_ids = self.summarization_model.generate(
+                        **inputs,
+                        max_length = 1500,
+                        length_penalty = 2.0,
+                        num_beams = 4,
+                        early_stopping = True
+                    )
+                summary = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+                summaries.append(summary)
 
-            summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            final_text = " ".join(summaries)
+            summarization = final_text
+            if len(final_text) > self.max_tokens:
+                inputs = self.summarization_tokenizer(final_text, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+                with torch.no_grad():
+                    summary_ids = self.summarization_model.generate(
+                        **inputs,
+                        max_length = 1500,
+                        length_penalty = 2.0,
+                        num_beams = 4,
+                        early_stopping = True
+                    )
+                summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            else:
+                summarization = final_text  
 
             workspace_id = str(uuid.uuid4())
 
@@ -162,7 +184,7 @@ class ToolsRepository:
             )
 
             workspace_detail = TrWorkspaceDetail(
-                workspaceDetailID = str(uuid.uuid4),
+                workspaceDetailID = str(uuid.uuid4()),
                 workspaceID = workspace_id,
                 toolsID = 1,
                 link = None,
