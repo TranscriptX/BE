@@ -1,6 +1,7 @@
 from repositories.workspaces_repository import WorkspacesRepository
 from sqlmodel import Session
 from models.requests.share_request import ShareRequest
+from models.requests.get_workspace_detail_request import GetWorkspaceDetailRequest
 from models.responses.response import Response
 from http import HTTPStatus
 import os
@@ -12,3 +13,6 @@ class WorkspacesService:
 
     async def share(self, request: ShareRequest):
         return await self.workspace_repository.share(request)
+    
+    async def getDetail(self, request: GetWorkspaceDetailRequest):
+        return await self.workspace_repository.getDetail(request)
