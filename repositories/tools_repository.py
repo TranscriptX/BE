@@ -3,9 +3,11 @@ from databases.tr_workspace import TrWorkspace
 from databases.tr_workspace_detail import TrWorkspaceDetail
 from models.requests.transcript_request import TranscriptRequest
 from models.requests.summarize_request import SummarizeRequest
+from models.requests.share_request import ShareRequest
 from models.responses.response import Response
 from models.responses.transcript_response import TranscriptResult
 from models.responses.summarize_response import SummarizeResult
+from models.responses.share_response import ShareResult
 from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
 from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
 from pipelines.language_model_pipeline import model as language_model
@@ -14,6 +16,7 @@ from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
 from transformers import BatchEncoding
+from dotenv import load_dotenv
 import pdfplumber
 import uuid
 import torch
@@ -24,6 +27,7 @@ import tempfile
 
 class ToolsRepository:
     def __init__(self, db: Session):
+        load_dotenv()
         self.db = db
         self.transcription_model = transcription_model
         self.transcription_processor = transcription_processor
@@ -31,6 +35,7 @@ class ToolsRepository:
         self.summarization_tokenizer = summarization_tokenizer
         self.language_model = language_model
         self.max_tokens = 1024
+        self.client_url = os.getenv("CLIENT_URL")
 
     async def transcript(self, request: TranscriptRequest, file_extension):
         try:
@@ -232,3 +237,37 @@ class ToolsRepository:
                 payload = None
             )
         
+    async def share(self, request: ShareRequest):
+        try:
+            workspace = self.db.exec(
+                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+            ).first()
+
+            if workspace is None:
+                return Response(
+                    statusCode = HTTPStatus.BAD_REQUEST,
+                    message = str(e),
+                    payload = None 
+                )
+            
+            if request.isGrantAccess:
+                workspace.link = f"{self.client_url}/workspace/{workspace.workspaceID}"
+            else:
+                workspace.link = None
+
+
+            self.db.commit()
+
+            return Response[ShareResult](
+                statusCode = HTTPStatus.CREATED,
+                message = None,
+                payload = ShareResult(
+                    link = workspace.link
+                )
+            ) 
+        except Exception as e:
+            return Response(
+                statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                message = str(e),
+                payload = None
+            )

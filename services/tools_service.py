@@ -2,6 +2,7 @@ from repositories.tools_repository import ToolsRepository
 from sqlmodel import Session
 from models.requests.transcript_request import TranscriptRequest
 from models.requests.summarize_request import SummarizeRequest
+from models.requests.share_request import ShareRequest
 from models.responses.response import Response
 from utils.base64_utils import get_file_extension, get_file_size
 from http import HTTPStatus
@@ -84,3 +85,6 @@ class ToolsService:
                 message = str(e),
                 payload = None
             )
+        
+    async def share(self, request: ShareRequest):
+        return await self.tools_repository.share(request)
