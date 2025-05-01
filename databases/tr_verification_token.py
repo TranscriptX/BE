@@ -11,5 +11,7 @@ class TrVerificationToken(TimestampMixin, table = True):
     token: str = Field(sa_column = Column(Text))
     expires: datetime
     verificationTypeID: int = Field(foreign_key = "LtVerificationType.verificationTypeID")
+    userID: str = Field(foreign_key = "MsUser.userID")
 
     verificationType: "LtVerificationType" = Relationship(back_populates = "tokens")
+    user: "MsUser" = Relationship(back_populates = "tokens")

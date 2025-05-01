@@ -6,7 +6,7 @@ from controllers.tools_controller import router as tools_router
 from controllers import auth_controller
 
 app = FastAPI(max_request_size = 256 * 1024 * 1024)
-# app.include_router(tools_router)
+app.include_router(tools_router)
 
 @app.on_event("startup")
 def on_startup():
