@@ -1,32 +1,33 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
-from models.requests.auth_requests import RegisterRequest, LoginRequest, ResetPasswordRequest, ResetPasswordTokenRequest
-from models.responses.auth_responses import TokenResponse
-from services import auth_service
+from fastapi import APIRouter, Depends, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from databases.dependencies import get_session
+from services.auth_service import register_user,verify_email,login_user,request_password_reset,reset_password
+from models.requests.auth_requests import RegisterRequest,LoginRequest,ResetPasswordRequest,ResetPasswordTokenRequest
+from models.responses.auth_responses import TokenResponse
+from services import auth_service
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth",tags=["Authentication"])
 
-@router.post("/register", response_model=dict)
+@router.post("/register")
 async def register(request: RegisterRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
-    return await auth_service.register_user(request, background_tasks, db)
+    return await register_user(request, background_tasks, db)
 
 @router.get("/verify-email")
-async def verify_email(token: str, db: Session = Depends(get_session)):
-    return await auth_service.verify_email(token, db)
+async def verify(token: str, db: Session = Depends(get_session)):
+    return await verify_email(token, db)
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 async def login(request: LoginRequest, db: Session = Depends(get_session)):
-    return await auth_service.login_user(request, db)
+    return await login_user(request, db)
 
-@router.post("/logout", response_model=dict)
-async def logout(token: str):
-    return await auth_service.logout_user(token)
+@router.post("/logout")
+def logout():
+    return {"msg": "Logged out successfully"}
 
-@router.post("/reset-password", response_model=dict)
-async def reset_password(request: ResetPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
-    return await auth_service.reset_password(request, background_tasks, db)
+@router.post("/request-password-reset")
+async def request_reset(request: ResetPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
+    return await request_password_reset(request, background_tasks, db)
 
-@router.post("/reset-password-token", response_model=dict)
-async def reset_password_token(request: ResetPasswordTokenRequest, db: Session = Depends(get_session)):
-    return await auth_service.reset_password_with_token(request, db)
+@router.post("/reset-password")
+async def reset_with_token(request: ResetPasswordTokenRequest, db: Session = Depends(get_session)):
+    return await reset_password(request, db)
