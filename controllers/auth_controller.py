@@ -21,8 +21,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_session)):
     return await login_user(request, db)
 
 @router.post("/logout")
-def logout():
-    return {"msg": "Logged out successfully"}
+async def logout():
+    return await auth_service.logout_user()
 
 @router.post("/request-password-reset")
 async def request_reset(request: ResetPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):

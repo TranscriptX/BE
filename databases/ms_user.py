@@ -4,6 +4,7 @@ from databases.timestamp_mixin import TimestampMixin
 from databases.ms_user_permission import MsUserPermission
 from databases.tr_workspace import TrWorkspace
 from databases.tr_verification_token import TrVerificationToken
+from datetime import datetime
 import uuid
 
 class MsUser(TimestampMixin, table = True):
@@ -16,7 +17,8 @@ class MsUser(TimestampMixin, table = True):
     password: str = Field(max_length = 64)
     roleID: int = Field(foreign_key = "LtRole.roleID")
     isVerified: bool
-
+    lastLogin: datetime | None
+    
     role: "LtRole" = Relationship(back_populates = "users")
     userPermissions: list["MsUserPermission"] = Relationship(back_populates = "user")
     workspaces: list["TrWorkspace"] = Relationship(back_populates = "user")
