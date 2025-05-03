@@ -7,9 +7,11 @@ class TrVerificationToken(TimestampMixin, table = True):
     __tablename__ = "TrVerificationToken"  
     __table_args__ = {"extend_existing": True}
 
-    verificationTokenID: int = Field(default = None, primary_key = True)
+    verificationTokenID: str = Field(primary_key = True, max_length = 36)
     token: str = Field(sa_column = Column(Text))
     expires: datetime
     verificationTypeID: int = Field(foreign_key = "LtVerificationType.verificationTypeID")
+    userID: str = Field(foreign_key = "MsUser.userID")
 
     verificationType: "LtVerificationType" = Relationship(back_populates = "tokens")
+    user: "MsUser" = Relationship(back_populates = "tokens")
