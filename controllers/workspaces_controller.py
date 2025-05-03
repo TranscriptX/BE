@@ -6,7 +6,7 @@ from models.requests.share_request import ShareRequest
 from models.requests.get_workspace_detail_request import GetWorkspaceDetailRequest
 from models.requests.export_workspace_request import ExportWorkspaceRequest
 
-router = APIRouter(prefix = "/api/workspaces")
+router = APIRouter(prefix = "/api/workspaces", tags = ["Workspace"])
 
 @router.post("/share")
 async def share(request: ShareRequest, db: Session = Depends(get_session)):

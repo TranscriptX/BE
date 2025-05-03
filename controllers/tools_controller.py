@@ -5,7 +5,7 @@ from databases.dependencies import get_session
 from models.requests.transcript_request import TranscriptRequest
 from models.requests.summarize_request import SummarizeRequest
 
-router = APIRouter(prefix = "/api/tools")
+router = APIRouter(prefix = "/api/tools", tags = ["Tools"])
 
 @router.post("/transcript")
 async def transcript(request: TranscriptRequest, db: Session = Depends(get_session)):
