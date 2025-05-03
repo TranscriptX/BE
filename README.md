@@ -30,6 +30,5 @@ Steps to run this project locally:
   - `python -m venv venv`
   - `venv\Scripts\activate`
   - `pip install fastapi uvicorn sqlmodel dotenv pymysql torch torchaudio soundfile transformers moviepy==1.0.3 pdfplumber python-docx deepmultilingualpunctuation bcrypt passlib jose pydantic[email] python-jose==3.4.0 xhtml2pdf`
-  - ```playwright install```
 - Run the app locally using `uvicorn main:app --reload` in the terminal. If you run the project for the first time, it will automatically create migrations.
 - If you run the project for the first time, after running the application, create a new terminal and fill the database with initial value with `python -m databases.seed_database`.
