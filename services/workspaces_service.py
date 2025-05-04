@@ -4,6 +4,7 @@ from models.requests.share_request import ShareRequest
 from models.requests.get_workspace_detail_request import GetWorkspaceDetailRequest
 from models.requests.export_workspace_request import ExportWorkspaceRequest
 from models.responses.response import Response
+from models.requests.dashboard_request import DashboardFilterRequest
 from http import HTTPStatus
 import os
 
@@ -20,3 +21,6 @@ class WorkspacesService:
     
     async def export(self, request: ExportWorkspaceRequest):
         return await self.workspace_repository.export(request)
+    
+    async def getDashboard(self, request: DashboardFilterRequest):
+        return await self.workspace_repository.getDashboard(request)

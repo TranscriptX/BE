@@ -7,6 +7,8 @@ from models.requests.export_workspace_request import ExportWorkspaceRequest
 from models.responses.response import Response
 from models.responses.share_response import ShareResult
 from models.responses.get_workspace_detail_response import GetWorkspaceDetailResult
+from models.requests.dashboard_request import DashboardFilterRequest
+from models.responses.dashboard_response import DashboardHistoryItem
 from utils.base64_utils import get_file_extension
 from fastapi.responses import StreamingResponse
 from http import HTTPStatus
@@ -17,6 +19,9 @@ import uuid
 import os
 import asyncio
 import traceback
+from typing import List
+from sqlalchemy import or_
+from datetime import datetime
 
 class WorkspacesRepository:
     def __init__(self, db: Session):
@@ -286,6 +291,90 @@ class WorkspacesRepository:
                 media_type = "application/pdf",
                 headers = {"Content-Disposition": f"attachment; filename={workspace.workspaceID}.pdf"}
             )
+        except Exception as e:
+            return Response(
+                statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                message = str(traceback.format_exc()),
+                payload = None
+            )
+    
+    async def getDashboard(self, request: DashboardFilterRequest):
+        try:
+            query = select(TrWorkspace).where(TrWorkspace.userID == request.userID)
+
+            if request.startDate and request.endDate:
+                query = query.where(
+                    TrWorkspace.dateIn.between(request.startDate, request.endDate)
+                )
+
+            if request.type:
+                if request.type.lower() == "transcription":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
+                    )
+                elif request.type.lower() == "summarization":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1)
+                    )
+                elif request.type.lower() == "transcription and summarization":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1),
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
+                    )
+
+            if request.isShared is not None:
+                if request.isShared:
+                    query = query.where(TrWorkspace.link.is_not(None))
+                else:
+                    query = query.where(TrWorkspace.link.is_(None))
+
+            results = self.db.exec(query).all()
+
+            items: List[DashboardHistoryItem] = []
+
+            for workspace in results:
+                transcription = any(d.toolsID == 2 for d in workspace.workspaceDetail)
+                summarization = any(d.toolsID == 1 for d in workspace.workspaceDetail)
+
+                if request.search:
+                    if request.search.lower() not in workspace.name.lower() and request.search.lower() not in workspace.url.lower():
+                        continue
+
+                item = DashboardHistoryItem(
+                    workspaceID = workspace.workspaceID,
+                    title = workspace.name,
+                    description = workspace.description,
+                    createdDate = workspace.dateIn,
+                    type = (
+                        "Transcription and Summarization" if transcription and summarization else
+                        "Transcription" if transcription else
+                        "Summarization" if summarization else
+                        "-"
+                    ),
+                    isShared = workspace.link is not None,
+                    url = workspace.url
+                )
+                items.append(item)
+
+            if request.sortBy:
+                reverse = request.sortOrder == "desc"
+                if request.sortBy == "title":
+                    items.sort(key=lambda x: x.title or "", reverse=reverse)
+                elif request.sortBy == "description":
+                    items.sort(key=lambda x: x.description or "", reverse=reverse)
+                elif request.sortBy == "createdDate":
+                    items.sort(key=lambda x: x.createdDate, reverse=reverse)
+                elif request.sortBy == "type":
+                    items.sort(key=lambda x: x.type or "", reverse=reverse)
+                elif request.sortBy == "url":
+                    items.sort(key=lambda x: x.url or "", reverse=reverse)
+
+            return Response[List[DashboardHistoryItem]](
+                statusCode = HTTPStatus.OK,
+                message = None,
+                payload = items
+            )
+
         except Exception as e:
             return Response(
                 statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
