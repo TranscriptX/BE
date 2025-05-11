@@ -6,6 +6,10 @@ from models.requests.share_request import ShareRequest
 from models.requests.get_workspace_detail_request import GetWorkspaceDetailRequest
 from models.requests.export_workspace_request import ExportWorkspaceRequest
 from models.requests.dashboard_request import DashboardFilterRequest
+from models.requests.edit_request import EditRequest
+from models.requests.delete_request import DeleteRequest
+from models.responses.response import Response
+from typing import Uniondd
 
 router = APIRouter(prefix = "/api/workspaces")
 
@@ -28,3 +32,13 @@ async def export(request: ExportWorkspaceRequest, db: Session = Depends(get_sess
 async def dashboard(request: DashboardFilterRequest, db: Session = Depends(get_session)):
     workspaces_service = WorkspacesService(db)
     return await workspaces_service.getDashboard(request)
+
+@router.post("/edit")
+async def edit(request: EditRequest, db: Session = Depends(get_session)):
+    workspaces_service = WorkspacesService(db)
+    return await workspaces_service.edit(request)
+
+@router.post("/delete")
+async def edit(request: DeleteRequest, db: Session = Depends(get_session)):
+    workspaces_service = WorkspacesService(db)
+    return await workspaces_service.edit(request)

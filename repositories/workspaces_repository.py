@@ -9,6 +9,8 @@ from models.responses.share_response import ShareResult
 from models.responses.get_workspace_detail_response import GetWorkspaceDetailResult
 from models.requests.dashboard_request import DashboardFilterRequest
 from models.responses.dashboard_response import DashboardHistoryItem
+from models.requests.edit_request import EditRequest
+from models.requests.delete_request import DeleteRequest
 from utils.base64_utils import get_file_extension
 from fastapi.responses import StreamingResponse
 from http import HTTPStatus
@@ -381,3 +383,50 @@ class WorkspacesRepository:
                 message = str(traceback.format_exc()),
                 payload = None
             )
+
+    async def edit(self, request: EditRequest):
+        try:
+            workspace = self.db.exec(
+                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+            ).first()
+
+            if workspace is None:
+                return Response(
+                    statusCode=HTTPStatus.NOT_FOUND,
+                    message="Workspace not found",
+                    payload=None
+                )
+
+            if workspace.userID != request.userID:
+                return Response(
+                    statusCode=HTTPStatus.FORBIDDEN,
+                    message="You are not authorized to edit this workspace",
+                    payload=None
+                )
+
+            workspace.name = request.title
+            workspace.description = request.description
+            self.db.commit()
+
+            return Response(
+                statusCode=HTTPStatus.OK,
+                message="Workspace updated successfully",
+                payload=None
+            )
+        except Exception as e:
+            return Response(
+                statusCode=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=str(e),
+                payload=None
+            )
+            
+    async def delete(self, request: DeleteRequest) -> int:
+        updated_count = 0
+        for workspaceID in request.workspaceID:
+            workspace = self.db.get(TrWorkspace, workspaceID)
+            if workspace and workspace.isActive:
+                workspace.isActive = False
+                self.db.add(workspace)
+                updated_count += 1
+        self.db.commit()
+        return updated_count
