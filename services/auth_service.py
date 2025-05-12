@@ -170,12 +170,13 @@ async def generate_token(request: GenerateTokenRequest, db):
             )
         
         get_user_token = repo.get_token_by_user(user.userID, request.typeID)
-        if get_user_token.dateIn and datetime.utcnow() - get_user_token.dateIn <= timedelta(minute = 2):
-            return Response(
-                statusCode = HTTPStatus.BAD_REQUEST,
-                message = "You can request another token after 2 minutes.",
-                payload = None
-            )
+        if get_user_token is not None:
+            if get_user_token.dateIn and datetime.utcnow() - get_user_token.dateIn <= timedelta(minutes = 2):
+                return Response(
+                    statusCode = HTTPStatus.BAD_REQUEST,
+                    message = "You can request another token after 2 minutes.",
+                    payload = None
+                )
         
         token = str(uuid4())
 
@@ -185,10 +186,17 @@ async def generate_token(request: GenerateTokenRequest, db):
                 message = "Email not verified",
                 payload = None
             )        
+        
+        if user.isVerified and request.typeID == 1:
+            return Response(
+                statusCode = HTTPStatus.FORBIDDEN,
+                message = "Account already verified",
+                payload = None
+            )
 
         verification_token = TrVerificationToken(
             verificationTokenID = str(uuid4()),
-            userID = user.ID,
+            userID = user.userID,
             verificationTypeID = request.typeID,
             token = token,
             expires = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)

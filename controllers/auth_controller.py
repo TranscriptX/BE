@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from databases.dependencies import get_session
-from services.auth_service import register_user,verify_email,login_user,request_password_reset,reset_password
-from models.requests.auth_requests import RegisterRequest,LoginRequest,ResetPasswordRequest,ResetPasswordTokenRequest
+from services.auth_service import register_user,verify_email,login_user,request_password_reset,reset_password, generate_token
+from models.requests.auth_requests import RegisterRequest,LoginRequest,ResetPasswordRequest,ResetPasswordTokenRequest, GenerateTokenRequest
 from services import auth_service
 
 router = APIRouter(prefix="/api/auth",tags=["Authentication"])
@@ -30,3 +30,7 @@ async def request_reset(request: ResetPasswordRequest, db: Session = Depends(get
 @router.post("/reset-password")
 async def reset_with_token(request: ResetPasswordTokenRequest, db: Session = Depends(get_session)):
     return await reset_password(request, db)
+
+@router.post("/generate-token")
+async def generate_token_handler(request: GenerateTokenRequest, db: Session = Depends(get_session)):
+    return await generate_token(request, db)
