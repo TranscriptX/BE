@@ -10,7 +10,7 @@ from models.requests.edit_request import EditRequest
 from models.requests.delete_request import DeleteRequest
 from models.responses.response import Response
 
-router = APIRouter(prefix = "/api/workspaces")
+router = APIRouter(prefix = "/api/workspaces", tags = ["Workspace"])
 
 @router.post("/share")
 async def share(request: ShareRequest, db: Session = Depends(get_session)):

@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from repositories.auth_repository import AuthRepository
-from models.requests.auth_requests import RegisterRequest, LoginRequest, ResetPasswordRequest, ResetPasswordTokenRequest
+from models.requests.auth_requests import RegisterRequest, LoginRequest, ResetPasswordRequest, ResetPasswordTokenRequest, GenerateTokenRequest
 from models.responses.auth_responses import TokenResponse
 from databases.ms_user import MsUser
 from databases.tr_verification_token import TrVerificationToken
@@ -156,6 +156,81 @@ async def login_user(request: LoginRequest, db):
 async def logout_user():
     return {"message": "Successfully logged out"}
 
+async def generate_token(request: GenerateTokenRequest, db):
+    try:
+        repo = AuthRepository(db)
+
+        user = repo.get_user_by_email(request.email)
+
+        if user is None:
+            return Response(
+                statusCode = HTTPStatus.NOT_FOUND,
+                message = "User is not found. Please register.",
+                payload = None
+            )
+        
+        get_user_token = repo.get_token_by_user(user.userID, request.typeID)
+        if get_user_token.dateIn and datetime.utcnow() - get_user_token.dateIn <= timedelta(minute = 2):
+            return Response(
+                statusCode = HTTPStatus.BAD_REQUEST,
+                message = "You can request another token after 2 minutes.",
+                payload = None
+            )
+        
+        token = str(uuid4())
+
+        if not user.isVerified and request.typeID == 2:
+            return Response(
+                statusCode = HTTPStatus.FORBIDDEN,
+                message = "Email not verified",
+                payload = None
+            )        
+
+        verification_token = TrVerificationToken(
+            verificationTokenID = str(uuid4()),
+            userID = user.ID,
+            verificationTypeID = request.typeID,
+            token = token,
+            expires = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
+        )
+
+        repo.create_verification_token(verification_token)
+
+        if request.typeID == 1:
+            if not email_utils.send_verification_email(user.email, token):
+                return Response(
+                    statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                    message = "SMTP Server error",
+                    payload = None
+                )
+        elif request.typeID == 2:
+            if not email_utils.send_reset_password_email(user.email, token):
+                return Response(
+                    statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                    message = "SMTP Server error",
+                    payload = None
+                )
+        else:
+            return Response(
+                statusCode = HTTPStatus.BAD_REQUEST,
+                message = "Invalid typeID",
+                payload = None
+            )
+
+        db.commit()
+
+        return Response(
+            statusCode = HTTPStatus.OK,
+            message = "Please check your email",
+            payload = None
+        )
+    except Exception as e:
+        return Response(
+            statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+            message = str(e),
+            payload = None
+        )
+
 async def request_password_reset(request: ResetPasswordRequest, db):
     try:
         repo = AuthRepository(db)
@@ -168,6 +243,12 @@ async def request_password_reset(request: ResetPasswordRequest, db):
             )
             # raise HTTPException(status_code=404, detail="User not found")
 
+        if not user.isVerified:
+            return Response(
+                statusCode = HTTPStatus.FORBIDDEN,
+                message = "Email not verified",
+                payload = None
+            )
         token = str(uuid4())
         token_entry = TrVerificationToken(
             verificationTokenID=str(uuid4()),
