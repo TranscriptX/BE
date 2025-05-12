@@ -20,7 +20,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/api/auth/register",
             "/api/auth/verify-email",
             "/api/auth/request-password-reset",
-            "/api/auth/reset-password"
+            "/api/auth/reset-password",
+            "/api/auth/generate-token"
         ]
 
     async def dispatch(self, request: Request, call_next):
