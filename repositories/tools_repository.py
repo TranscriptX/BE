@@ -120,7 +120,10 @@ class ToolsRepository:
             if request.workspaceID is not None:
                 text = self.db.exec(
                     select(TrWorkspaceDetail.result)
-                    .where(TrWorkspaceDetail.workspaceID == request.workspaceID)
+                    .where(
+                        TrWorkspaceDetail.workspaceID == request.workspaceID, 
+                        TrWorkspaceDetail.isActive == True
+                    )
                 ).first()
 
                 if text is None:
