@@ -34,7 +34,11 @@ class WorkspacesRepository:
     async def share(self, request: ShareRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -69,7 +73,11 @@ class WorkspacesRepository:
     async def getDetail(self, request: GetWorkspaceDetailRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -142,7 +150,11 @@ class WorkspacesRepository:
     async def export(self, request: ExportWorkspaceRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -302,7 +314,10 @@ class WorkspacesRepository:
     
     async def getDashboard(self, request: DashboardFilterRequest):
         try:
-            query = select(TrWorkspace).where(TrWorkspace.userID == request.userID)
+            query = select(TrWorkspace).where(
+                TrWorkspace.userID == request.userID,
+                TrWorkspace.isActive == True
+            )
 
             if request.startDate and request.endDate:
                 query = query.where(
@@ -387,7 +402,11 @@ class WorkspacesRepository:
     async def edit(self, request: EditRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -420,13 +439,24 @@ class WorkspacesRepository:
                 payload=None
             )
             
-    async def delete(self, request: DeleteRequest) -> int:
-        updated_count = 0
-        for workspaceID in request.workspaceID:
-            workspace = self.db.get(TrWorkspace, workspaceID)
-            if workspace and workspace.isActive:
-                workspace.isActive = False
-                self.db.add(workspace)
-                updated_count += 1
-        self.db.commit()
-        return updated_count
+    async def delete(self, request: DeleteRequest):
+        try:
+            for workspaceID in request.workspaceID:
+                workspace = self.db.get(TrWorkspace, workspaceID)
+                if workspace and workspace.isActive:
+                    workspace.isActive = False
+
+            self.db.commit()
+            
+            return Response(
+                statusCode = HTTPStatus.NO_CONTENT,
+                message = str(e),
+                payload = None
+            )        
+        except Exception as e:
+            return Response(
+                statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                message = str(e),
+                payload = None
+            )
+
