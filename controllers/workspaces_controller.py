@@ -9,7 +9,6 @@ from models.requests.dashboard_request import DashboardFilterRequest
 from models.requests.edit_request import EditRequest
 from models.requests.delete_request import DeleteRequest
 from models.responses.response import Response
-from typing import Uniondd
 
 router = APIRouter(prefix = "/api/workspaces")
 
