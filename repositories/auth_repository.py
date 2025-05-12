@@ -9,32 +9,17 @@ class AuthRepository:
     def get_user_by_email(self, email: str):
         return self.db.query(MsUser).filter(MsUser.email == email, MsUser.isActive == True).first()
 
-    # def get_user_by_name(self, name: str):
-    #     return self.db.query(MsUser).filter(MsUser.name == name).first()
-
     def create_user(self, user: MsUser):
         self.db.add(user)
-        # self.db.commit()
-        # self.db.refresh(user)
-        # return user
-
-    # def update_user(self, user: MsUser):
-        # self.db.commit()
-        # self.db.refresh(user)
-        # return user
 
     def get_token(self, token: str):
         return self.db.query(TrVerificationToken).filter(TrVerificationToken.token == token, TrVerificationToken.isActive == True).first()
 
     def create_verification_token(self, token: TrVerificationToken):
         self.db.add(token)
-        # self.db.commit()
-        ## self.db.refresh(token)
-        # return token
 
     def delete_verification_token(self, token: TrVerificationToken):
         self.db.delete(token)
-        # self.db.commit()
 
     def get_token_by_user(self, user_id: str, type_id: int):
         return self.db.query(TrVerificationToken).filter(
