@@ -1,17 +1,17 @@
-from fastapi import FastAPI, Depends
-from sqlmodel import Session, select
+from fastapi import FastAPI
+from pipelines.summarization_pipeline import model, tokenizer
+from pipelines.transcription_pipeline import model, processor
+from databases.database import create_db_and_tables
+from controllers.tools_controller import router as tools_router
+from controllers import auth_controller
+from controllers.workspaces_controller import router as workspaces_router
 
-from databases.database import engine, create_db_and_tables
-from databases.dependencies import get_session
-from databases.lt_role import LtRole
-
-app = FastAPI()
+app = FastAPI(max_request_size = 256 * 1024 * 1024)
+app.include_router(tools_router)
+app.include_router(workspaces_router)
 
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
 
-@app.get("/roles/")
-def get_roles(session: Session = Depends(get_session)):
-    roles = session.exec(select(LtRole)).all()
-    return roles
+app.include_router(auth_controller.router)

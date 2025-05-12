@@ -1,4 +1,4 @@
-from sqlmodel import Field, Relationship, Text
+from sqlmodel import Column, Field, Relationship, Text
 from databases.timestamp_mixin import TimestampMixin
 # from databases.lt_tools import LtTools
 # from databases.tr_workspace import TrWorkspace
@@ -11,8 +11,7 @@ class TrWorkspaceDetail(TimestampMixin, table = True):
     workspaceDetailID: str = Field(primary_key = True, max_length = 36)
     workspaceID: str = Field(foreign_key = "TrWorkspace.workspaceID", max_length = 36)
     toolsID: int = Field(foreign_key = "LtTools.toolsID")
-    link: str | None = Field(max_length = 255)
-    result: str = Field(sa_column = Text)
+    result: str = Field(sa_column = Column(Text))
 
     tool: "LtTools" = Relationship(back_populates = "workspaceDetail")
     workspace: "TrWorkspace" = Relationship(back_populates = "workspaceDetail")
