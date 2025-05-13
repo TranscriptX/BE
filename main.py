@@ -9,7 +9,7 @@ from controllers.tools_controller import router as tools_router
 from controllers import auth_controller
 from controllers.workspaces_controller import router as workspaces_router
 from middlewares.auth_middleware import AuthMiddleware
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     max_request_size = 256 * 1024 * 1024
@@ -47,4 +47,12 @@ app.add_middleware(AuthMiddleware)
 app.include_router(tools_router)
 app.include_router(workspaces_router)
 app.include_router(auth_controller.router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
