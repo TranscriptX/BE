@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 import os
 
 from databases.timestamp_mixin import TimestampMixin
-from databases.lt_feature import LtFeature
-from databases.lt_role import LtRole
+# from databases.lt_feature import LtFeature
+# from databases.lt_role import LtRole
 from databases.lt_tools import LtTools
 from databases.lt_verification_type import LtVerificationType
 from databases.ms_user import MsUser
-from databases.ms_user_permission import MsUserPermission
+# from databases.ms_user_permission import MsUserPermission
 from databases.tr_verification_token import TrVerificationToken
 from databases.tr_workspace import TrWorkspace  
 from databases.tr_workspace_detail import TrWorkspaceDetail
