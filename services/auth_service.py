@@ -9,7 +9,7 @@ from models.responses.auth_responses import TokenResponse
 from http import HTTPStatus
 from utils import hash_utils, jwt_utils, email_utils
 from uuid import uuid4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from dotenv import load_dotenv
 
@@ -93,7 +93,7 @@ async def verify_email(token: str, db):
         if not token_entry:
             return "Invalid token."
 
-        if token_entry.expires < datetime.utcnow():
+        if token_entry.expires < datetime.now(timezone.utc):
             return "Expired token."
 
         user = repo.get_user_by_email(token_entry.user.email)
@@ -300,7 +300,7 @@ async def reset_password(request: ResetPasswordTokenRequest, db):
             )
             # raise HTTPException(status_code=400, detail="Invalid reset token")
 
-        if token_entry.expires < datetime.utcnow():
+        if token_entry.expires < datetime.now(timezone.utc):
             return Response(
                 statusCode = HTTPStatus.BAD_REQUEST,
                 message = "Reset token expired.",
