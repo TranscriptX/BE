@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, Session
 from databases.database import engine
 from databases.lt_tools import LtTools
-from databases.lt_role import LtRole
+# from databases.lt_role import LtRole
 from databases.lt_verification_type import LtVerificationType
 from databases.ms_user import MsUser
 from dotenv import load_dotenv
@@ -24,16 +24,16 @@ def seed_database():
             )
         ]
 
-        roles = [
-            LtRole(
-                roleID = 1,
-                name = "User"
-            ),
-            LtRole(
-                role = 2,
-                name = "Admin"
-            )
-        ]
+        # roles = [
+        #     LtRole(
+        #         roleID = 1,
+        #         name = "User"
+        #     ),
+        #     LtRole(
+        #         role = 2,
+        #         name = "Admin"
+        #     )
+        # ]
 
         users = [
             MsUser(
@@ -41,7 +41,7 @@ def seed_database():
                 name = "Admin",
                 email = os.getenv("ADMIN_EMAIL"),
                 password = bcrypt.hashpw(os.getenv("ADMIN_PASSWORD").encode("utf-8"), bcrypt.gensalt()),
-                roleID = 2,
+                # roleID = 2,
                 isVerified = True
             )
         ]
@@ -57,7 +57,7 @@ def seed_database():
             ),            
         ]
 
-        session.add_all(tools + roles + users + verification_type)
+        session.add_all(tools + users + verification_type)
         session.commit()
         print("Successfully seed database")
 
