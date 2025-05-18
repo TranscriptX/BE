@@ -339,8 +339,8 @@ class WorkspacesRepository:
                         TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
                     )
 
-            if request.isShared is not None:
-                if request.isShared:
+            if request.sharedStatus is not None:
+                if request.sharedStatus:
                     query = query.where(TrWorkspace.link.is_not(None))
                 else:
                     query = query.where(TrWorkspace.link.is_(None))
@@ -369,7 +369,7 @@ class WorkspacesRepository:
                         "-"
                     ),
                     isShared = workspace.link is not None,
-                    url = workspace.url
+                    url = workspace.link
                 )
                 items.append(item)
 
