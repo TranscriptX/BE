@@ -22,8 +22,8 @@ import os
 import asyncio
 import traceback
 from typing import List
-from sqlalchemy import or_
-from datetime import datetime
+from sqlalchemy import or_, not_
+from datetime import datetime, timedelta
 
 class WorkspacesRepository:
     def __init__(self, db: Session):
@@ -53,7 +53,7 @@ class WorkspacesRepository:
             else:
                 workspace.link = None
 
-
+            workspace.dateUp = datetime.utcnow()
             self.db.commit()
 
             return Response[ShareResult](
@@ -75,7 +75,7 @@ class WorkspacesRepository:
             workspace = self.db.exec(
                 select(TrWorkspace)
                 .where(
-                    TrWorkspace.workspaceID == request,
+                    TrWorkspace.workspaceID == request.workspaceID,
                     TrWorkspace.isActive == True
                 )
             ).first()
@@ -319,19 +319,23 @@ class WorkspacesRepository:
                 TrWorkspace.isActive == True
             )
 
-            if request.startDate and request.endDate:
-                query = query.where(
-                    TrWorkspace.dateIn.between(request.startDate, request.endDate)
-                )
+            end_date = request.endDate + timedelta(days = 1) - timedelta(microseconds=1)
+
+            if request.startDate:
+                query = query.where(TrWorkspace.dateIn >= request.startDate)
+            if request.endDate:
+                query = query.where(TrWorkspace.dateIn <= end_date)
 
             if request.type:
                 if request.type.lower() == "transcription":
                     query = query.where(
-                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2),
+                        not_(TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1))
                     )
                 elif request.type.lower() == "summarization":
                     query = query.where(
-                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1)
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1),
+                        not_(TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2))
                     )
                 elif request.type.lower() == "transcription and summarization":
                     query = query.where(
@@ -339,8 +343,8 @@ class WorkspacesRepository:
                         TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
                     )
 
-            if request.isShared is not None:
-                if request.isShared:
+            if request.sharedStatus is not None:
+                if request.sharedStatus:
                     query = query.where(TrWorkspace.link.is_not(None))
                 else:
                     query = query.where(TrWorkspace.link.is_(None))
@@ -354,7 +358,7 @@ class WorkspacesRepository:
                 summarization = any(d.toolsID == 1 for d in workspace.workspaceDetail)
 
                 if request.search:
-                    if request.search.lower() not in workspace.name.lower() and request.search.lower() not in workspace.url.lower():
+                    if request.search.lower() not in (workspace.name or "").lower() and request.search.lower() not in (workspace.link or "").lower() and request.search.lower() not in (workspace.description or "").lower():
                         continue
 
                 item = DashboardHistoryItem(
@@ -369,22 +373,23 @@ class WorkspacesRepository:
                         "-"
                     ),
                     isShared = workspace.link is not None,
-                    url = workspace.url
+                    fileName = f"{workspace.workspaceID}{get_file_extension(workspace.file)}",
+                    link = workspace.link
                 )
                 items.append(item)
 
             if request.sortBy:
                 reverse = request.sortOrder == "desc"
                 if request.sortBy == "title":
-                    items.sort(key=lambda x: x.title or "", reverse=reverse)
+                    items.sort(key = lambda x: (x.title or "").lower(), reverse = reverse)
                 elif request.sortBy == "description":
-                    items.sort(key=lambda x: x.description or "", reverse=reverse)
+                    items.sort(key = lambda x: (x.description or "").lower(), reverse = reverse)
                 elif request.sortBy == "createdDate":
-                    items.sort(key=lambda x: x.createdDate, reverse=reverse)
+                    items.sort(key = lambda x: x.createdDate, reverse = reverse)
                 elif request.sortBy == "type":
-                    items.sort(key=lambda x: x.type or "", reverse=reverse)
+                    items.sort(key = lambda x: (x.type or "").lower(), reverse = reverse)
                 elif request.sortBy == "url":
-                    items.sort(key=lambda x: x.url or "", reverse=reverse)
+                    items.sort(key = lambda x: (x.link or "").lower(), reverse = reverse)
 
             return Response[List[DashboardHistoryItem]](
                 statusCode = HTTPStatus.OK,
@@ -425,6 +430,14 @@ class WorkspacesRepository:
 
             workspace.name = request.title
             workspace.description = request.description
+            
+            if request.shared is False:
+                workspace.link = None
+            else:
+                workspace.link = f"{self.client_url}/workspace/{workspace.workspaceID}"
+
+
+            workspace.dateUp = datetime.utcnow()
             self.db.commit()
 
             return Response(
@@ -443,14 +456,22 @@ class WorkspacesRepository:
         try:
             for workspaceID in request.workspaceID:
                 workspace = self.db.get(TrWorkspace, workspaceID)
+                if workspace.userID != request.userID:
+                    return Response(
+                        statusCode = HTTPStatus.FORBIDDEN,
+                        message = "You are not authorized to delete this workspace",
+                        payload = None
+                    )
+                
                 if workspace and workspace.isActive:
                     workspace.isActive = False
+                    workspace.dateUp = datetime.utcnow()
 
             self.db.commit()
             
             return Response(
                 statusCode = HTTPStatus.NO_CONTENT,
-                message = str(e),
+                message = "Workspace deleted succesfully",
                 payload = None
             )        
         except Exception as e:
