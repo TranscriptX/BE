@@ -75,7 +75,7 @@ class WorkspacesRepository:
             workspace = self.db.exec(
                 select(TrWorkspace)
                 .where(
-                    TrWorkspace.workspaceID == request,
+                    TrWorkspace.workspaceID == request.workspaceID,
                     TrWorkspace.isActive == True
                 )
             ).first()
