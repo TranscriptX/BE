@@ -105,7 +105,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = TranscriptResult(
-                    result = transcription
+                    result = transcription,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:
@@ -227,7 +228,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = SummarizeResult(
-                    result = summarization
+                    result = summarization,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:
