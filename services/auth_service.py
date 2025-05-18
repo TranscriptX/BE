@@ -50,7 +50,7 @@ async def register_user(request: RegisterRequest, db):
             name=request.name,
             email=request.email,
             password=hashed_password,
-            roleID=1,
+            # roleID=1,
             isVerified=False
         )
 
@@ -133,7 +133,8 @@ async def login_user(request: LoginRequest, db):
         # repo.update_user(user)
 
         token = jwt_utils.create_access_token(
-            data = {"sub": user.userID, "role": user.roleID},
+            # data = {"sub": user.userID, "role": user.roleID},
+            data = {"sub": user.userID, "name": user.name},
             expires_delta = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
         )
 
