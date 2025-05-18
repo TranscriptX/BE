@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlmodel import Session, select
 from databases.tr_workspace import TrWorkspace
 from databases.tr_workspace_detail import TrWorkspaceDetail
@@ -135,6 +136,18 @@ class ToolsRepository:
                     )
                 
                 workspace_id = request.workspaceID
+
+                workspace = self.db.exec(
+                    select(TrWorkspace)
+                    .where(
+                        TrWorkspace.workspaceID == workspace_id,
+                        TrWorkspace.isActive == True
+                    )
+                ).first()
+
+                workspace.name = request.name
+                workspace.description = request.description
+                workspace.dateUp = datetime.utcnow()
             elif request.file is not None:
                 file_data = request.file.split(",")[-1]
                 file_bytes = get_safe_base64(file_data)
