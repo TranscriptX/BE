@@ -319,11 +319,10 @@ class WorkspacesRepository:
                 TrWorkspace.isActive == True
             )
 
-            end_date = request.endDate + timedelta(days = 1) - timedelta(microseconds=1)
-
             if request.startDate:
                 query = query.where(TrWorkspace.dateIn >= request.startDate)
             if request.endDate:
+                end_date = request.endDate + timedelta(days = 1) - timedelta(microseconds=1)
                 query = query.where(TrWorkspace.dateIn <= end_date)
 
             if request.type:
