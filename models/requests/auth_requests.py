@@ -15,3 +15,7 @@ class ResetPasswordRequest(BaseModel):
 class ResetPasswordTokenRequest(BaseModel):
     token: str
     new_password: str
+
+class GenerateTokenRequest(BaseModel):
+    typeID: int
+    email: str

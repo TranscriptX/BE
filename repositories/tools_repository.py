@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlmodel import Session, select
 from databases.tr_workspace import TrWorkspace
 from databases.tr_workspace_detail import TrWorkspaceDetail
@@ -105,7 +106,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = TranscriptResult(
-                    result = transcription
+                    result = transcription,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:
@@ -120,7 +122,10 @@ class ToolsRepository:
             if request.workspaceID is not None:
                 text = self.db.exec(
                     select(TrWorkspaceDetail.result)
-                    .where(TrWorkspaceDetail.workspaceID == request.workspaceID)
+                    .where(
+                        TrWorkspaceDetail.workspaceID == request.workspaceID, 
+                        TrWorkspaceDetail.isActive == True
+                    )
                 ).first()
 
                 if text is None:
@@ -131,6 +136,18 @@ class ToolsRepository:
                     )
                 
                 workspace_id = request.workspaceID
+
+                workspace = self.db.exec(
+                    select(TrWorkspace)
+                    .where(
+                        TrWorkspace.workspaceID == workspace_id,
+                        TrWorkspace.isActive == True
+                    )
+                ).first()
+
+                workspace.name = request.name
+                workspace.description = request.description
+                workspace.dateUp = datetime.utcnow()
             elif request.file is not None:
                 file_data = request.file.split(",")[-1]
                 file_bytes = get_safe_base64(file_data)
@@ -224,7 +241,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = SummarizeResult(
-                    result = summarization
+                    result = summarization,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:
