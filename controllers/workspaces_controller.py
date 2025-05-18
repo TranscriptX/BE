@@ -38,6 +38,6 @@ async def edit(request: EditRequest, db: Session = Depends(get_session)):
     return await workspaces_service.edit(request)
 
 @router.post("/delete")
-async def edit(request: DeleteRequest, db: Session = Depends(get_session)):
+async def delete(request: DeleteRequest, db: Session = Depends(get_session)):
     workspaces_service = WorkspacesService(db)
-    return await workspaces_service.edit(request)
+    return await workspaces_service.delete(request)

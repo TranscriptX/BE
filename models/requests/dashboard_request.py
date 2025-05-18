@@ -1,12 +1,13 @@
 from typing import Optional
 from pydantic import BaseModel
+from datetime import datetime
 
 class DashboardFilterRequest(BaseModel):
     userID: str
-    startDate: Optional[str] = None  # Format: "YYYY-MM-DD"
-    endDate: Optional[str] = None
+    startDate: Optional[datetime] = None  # Format: "YYYY-MM-DD"
+    endDate: Optional[datetime] = None
     search: Optional[str] = None
     type: Optional[str] = None  # "Transcription", "Summarization", "Transcription and Summarization"
-    sharedStatus: Optional[str] = None  # "shared" | "private"
+    sharedStatus: Optional[bool] = None  # "shared" | "private"
     sortBy: Optional[str] = None  # "createdDate", "title", "description", "type", "link"
     sortOrder: Optional[str] = "desc"  # "asc" | "desc"
