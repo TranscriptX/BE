@@ -20,15 +20,13 @@ Steps to run this project locally:
   - `DB_HOST`
   - `DB_PORT`
   - `DB_NAME`
-- Make sure to configure these properties properly on `.env` based on chosen AI model, it's secret key, and your server load:
+- Make sure to configure these properties properly on `.env` based on chosen AI model (HuggingFace's Space) and your server load:
   - `TRANSCRIPTION_MODEL`
-  - `TRANSCRIPTION_TOKEN`
   - `SUMMARIZATION_MODEL`
-  - `SUMMARIZATION_TOKEN`
   - `MAX_FILE_SIZE_MB`
 - Create a virtual environment and switch to that environment. To create a virtual environment, follow these steps:
   - `python -m venv venv`
   - `venv\Scripts\activate`
-  - `pip install fastapi uvicorn sqlmodel dotenv pymysql torch torchaudio soundfile transformers moviepy==1.0.3 pdfplumber python-docx deepmultilingualpunctuation bcrypt passlib jose pydantic[email] python-jose==3.4.0 xhtml2pdf gradio_client`
+  - `pip install fastapi uvicorn sqlmodel dotenv pymysql soundfile moviepy==1.0.3 pdfplumber python-docx bcrypt passlib jose pydantic[email] python-jose==3.4.0 xhtml2pdf gradio_client`
 - Run the app locally using `uvicorn main:app --reload` in the terminal. If you run the project for the first time, it will automatically create migrations.
 - If you run the project for the first time, after running the application, create a new terminal and fill the database with initial value with `python -m databases.seed_database`.
