@@ -35,16 +35,16 @@ def seed_database():
         #     )
         # ]
 
-        users = [
-            MsUser(
-                userID = str(uuid.uuid4()),
-                name = "Admin",
-                email = os.getenv("ADMIN_EMAIL"),
-                password = bcrypt.hashpw(os.getenv("ADMIN_PASSWORD").encode("utf-8"), bcrypt.gensalt()),
-                # roleID = 2,
-                isVerified = True
-            )
-        ]
+        # users = [
+        #     MsUser(
+        #         userID = str(uuid.uuid4()),
+        #         name = "Admin",
+        #         email = os.getenv("ADMIN_EMAIL"),
+        #         password = bcrypt.hashpw(os.getenv("ADMIN_PASSWORD").encode("utf-8"), bcrypt.gensalt()),
+        #         # roleID = 2,
+        #         isVerified = True
+        #     )
+        # ]
 
         verification_type = [
             LtVerificationType(
@@ -57,7 +57,7 @@ def seed_database():
             ),            
         ]
 
-        session.add_all(tools + users + verification_type)
+        session.add_all(tools + verification_type)
         session.commit()
         print("Successfully seed database")
 
