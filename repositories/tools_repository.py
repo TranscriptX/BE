@@ -8,18 +8,18 @@ from models.responses.response import Response
 from models.responses.transcript_response import TranscriptResult
 from models.responses.summarize_response import SummarizeResult
 # from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
-from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
-from pipelines.language_model_pipeline import model as language_model
+# from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
+# from pipelines.language_model_pipeline import model as language_model
 from http import HTTPStatus
 from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
 from dotenv import load_dotenv
-from gradio_client import Client
+from gradio_client import Client, handle_file
 import pdfplumber
 import uuid
-import torch
-import torchaudio
+# import torch
+# import torchaudio
 import io
 import os
 import tempfile
@@ -28,17 +28,18 @@ class ToolsRepository:
     def __init__(self, db: Session):
         load_dotenv()
         self.db = db
-        self.transcription_model = transcription_model
-        self.transcription_processor = transcription_processor
+        self.transcription_model = os.getenv("TRANSCRIPTION_MODEL")
+        # self.transcription_processor = transcription_processor
         self.summarization_model = os.getenv("SUMMARIZATION_MODEL")
         # self.summarization_tokenizer = summarization_tokenizer
-        self.language_model = language_model
+        # self.language_model = language_model
         self.max_tokens = 1024
         self.client_url = os.getenv("CLIENT_URL")
 
     async def transcript(self, request: TranscriptRequest, file_extension):
         try:
-            torchaudio.set_audio_backend("soundfile")
+            # torchaudio.set_audio_backend("soundfile")
+            client = Client(self.transcription_model)
 
             if file_extension == ".mp4":
                 video_bytes = get_safe_base64(request.file)
@@ -52,14 +53,30 @@ class ToolsRepository:
                 audio_stream.write_audiofile(audio_path)
                 video.close()
 
-                waveform, sample_rate = torchaudio.load(audio_path, format = "wav")
-
+                # waveform, sample_rate = torchaudio.load(audio_path, format = "wav")
+                transcription = client.predict(
+                    audio_stream = handle_file(audio_path),
+                    is_video = True,
+                    api_name = "/predict"
+                
+                )                
                 os.remove(tmp_video_path)
                 os.remove(audio_path)
             elif file_extension in [".mp3", ".wav", ".mpeg"]:
                 audio_bytes = get_safe_base64(request.file)
-                audio_stream = io.BytesIO(audio_bytes)
-                waveform, sample_rate = torchaudio.load(audio_stream)
+                # audio_stream = io.BytesIO(audio_bytes)
+                # waveform, sample_rate = torchaudio.load(audio_stream)
+                with tempfile.NamedTemporaryFile(delete = False, suffix = ".wav") as tmp_file:
+                    tmp_file.write(audio_bytes)
+                    tmp_file_path = tmp_file.name
+
+                transcription = client.predict(
+                    audio_stream = handle_file(tmp_file_path),
+                    is_video = False,
+                    api_name = "/predict"
+                )
+
+                os.remove(tmp_file_path)
             else:
                 return Response(
                     statusCode = HTTPStatus.BAD_REQUEST,
@@ -67,20 +84,20 @@ class ToolsRepository:
                     payload = None
                 )
 
-            target_sample_rate = 16000
-            if sample_rate != target_sample_rate:
-                transform = torchaudio.transforms.Resample(orig_freq = sample_rate, new_freq = target_sample_rate)
-                waveform = transform(waveform)
+            # target_sample_rate = 16000
+            # if sample_rate != target_sample_rate:
+            #     transform = torchaudio.transforms.Resample(orig_freq = sample_rate, new_freq = target_sample_rate)
+            #     waveform = transform(waveform)
 
-            input_values = self.transcription_processor(waveform.squeeze().numpy(), return_tensors = "pt", sampling_rate = target_sample_rate).input_values
+            # input_values = self.transcription_processor(waveform.squeeze().numpy(), return_tensors = "pt", sampling_rate = target_sample_rate).input_values
 
-            with torch.no_grad():
-                logits = self.transcription_model(input_values).logits
+            # with torch.no_grad():
+            #     logits = self.transcription_model(input_values).logits
 
-            predicted_ids = torch.argmax(logits, dim = -1)
-            transcription = self.transcription_processor.batch_decode(predicted_ids)[0]
-            transcription = self.language_model.restore_punctuation(transcription)
-            
+            # predicted_ids = torch.argmax(logits, dim = -1)
+            # transcription = self.transcription_processor.batch_decode(predicted_ids)[0]
+            # transcription = self.language_model.restore_punctuation(transcription)
+
             workspace_id = str(uuid.uuid4())
 
             workspace = TrWorkspace(
