@@ -7,7 +7,7 @@ from models.requests.summarize_request import SummarizeRequest
 from models.responses.response import Response
 from models.responses.transcript_response import TranscriptResult
 from models.responses.summarize_response import SummarizeResult
-from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
+# from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
 from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
 from pipelines.language_model_pipeline import model as language_model
 from http import HTTPStatus
@@ -15,6 +15,7 @@ from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
 from dotenv import load_dotenv
+from gradio_client import Client
 import pdfplumber
 import uuid
 import torch
@@ -29,8 +30,8 @@ class ToolsRepository:
         self.db = db
         self.transcription_model = transcription_model
         self.transcription_processor = transcription_processor
-        self.summarization_model = summarization_model
-        self.summarization_tokenizer = summarization_tokenizer
+        self.summarization_model = os.getenv("SUMMARIZATION_MODEL")
+        # self.summarization_tokenizer = summarization_tokenizer
         self.language_model = language_model
         self.max_tokens = 1024
         self.client_url = os.getenv("CLIENT_URL")
@@ -189,42 +190,47 @@ class ToolsRepository:
                     message = "Invalid model state",
                     payload = None
                 )
+            
+            # chunk_size = self.max_tokens * 4
+            # overlap = chunk_size // 4 
+            # step = chunk_size - overlap
+            # chunks = [text[i:i + chunk_size] for i in range(0, len(text), step)]
 
-            chunk_size = self.max_tokens * 4
-            overlap = chunk_size // 4 
-            step = chunk_size - overlap
-            chunks = [text[i:i + chunk_size] for i in range(0, len(text), step)]
+            # summaries = []
+            # for chunk in chunks:
+            #     inputs = self.summarization_tokenizer(chunk, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+            #     with torch.no_grad():
+            #         summary_ids = self.summarization_model.generate(
+            #             **inputs,
+            #             max_length = 1500,
+            #             length_penalty = 2.0,
+            #             num_beams = 4,
+            #             early_stopping = True
+            #         )
+            #     summary = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            #     summaries.append(summary)
 
-            summaries = []
-            for chunk in chunks:
-                inputs = self.summarization_tokenizer(chunk, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
-                with torch.no_grad():
-                    summary_ids = self.summarization_model.generate(
-                        **inputs,
-                        max_length = 1500,
-                        length_penalty = 2.0,
-                        num_beams = 4,
-                        early_stopping = True
-                    )
-                summary = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
-                summaries.append(summary)
-
-            final_text = " ".join(summaries)
-            summarization = final_text
-            if len(final_text) > self.max_tokens:
-                inputs = self.summarization_tokenizer(final_text, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
-                with torch.no_grad():
-                    summary_ids = self.summarization_model.generate(
-                        **inputs,
-                        min_length = 300,
-                        max_length = 1500,
-                        length_penalty = 2.0,
-                        num_beams = 4,
-                        early_stopping = True
-                    )
-                summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
-            else:
-                summarization = final_text  
+            # final_text = " ".join(summaries)
+            # summarization = final_text
+            # if len(final_text) > self.max_tokens:
+            #     inputs = self.summarization_tokenizer(final_text, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+            #     with torch.no_grad():
+            #         summary_ids = self.summarization_model.generate(
+            #             **inputs,
+            #             min_length = 300,
+            #             max_length = 1500,
+            #             length_penalty = 2.0,
+            #             num_beams = 4,
+            #             early_stopping = True
+            #         )
+            #     summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            # else:
+            #     summarization = final_text  
+            client = Client(self.summarization_model)
+            summarization = client.predict(
+                text = text,
+                api_name = "/predict"
+            )
 
             workspace_detail = TrWorkspaceDetail(
                 workspaceDetailID = str(uuid.uuid4()),
