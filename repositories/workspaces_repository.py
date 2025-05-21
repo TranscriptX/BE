@@ -7,6 +7,10 @@ from models.requests.export_workspace_request import ExportWorkspaceRequest
 from models.responses.response import Response
 from models.responses.share_response import ShareResult
 from models.responses.get_workspace_detail_response import GetWorkspaceDetailResult
+from models.requests.dashboard_request import DashboardFilterRequest
+from models.responses.dashboard_response import DashboardHistoryItem
+from models.requests.edit_request import EditRequest
+from models.requests.delete_request import DeleteRequest
 from utils.base64_utils import get_file_extension
 from fastapi.responses import StreamingResponse
 from http import HTTPStatus
@@ -17,6 +21,9 @@ import uuid
 import os
 import asyncio
 import traceback
+from typing import List
+from sqlalchemy import or_, not_
+from datetime import datetime, timedelta
 
 class WorkspacesRepository:
     def __init__(self, db: Session):
@@ -27,7 +34,11 @@ class WorkspacesRepository:
     async def share(self, request: ShareRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -42,7 +53,7 @@ class WorkspacesRepository:
             else:
                 workspace.link = None
 
-
+            workspace.dateUp = datetime.utcnow()
             self.db.commit()
 
             return Response[ShareResult](
@@ -62,7 +73,11 @@ class WorkspacesRepository:
     async def getDetail(self, request: GetWorkspaceDetailRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -135,7 +150,11 @@ class WorkspacesRepository:
     async def export(self, request: ExportWorkspaceRequest):
         try:
             workspace = self.db.exec(
-                select(TrWorkspace).where(TrWorkspace.workspaceID == request.workspaceID)
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
             ).first()
 
             if workspace is None:
@@ -292,3 +311,172 @@ class WorkspacesRepository:
                 message = str(traceback.format_exc()),
                 payload = None
             )
+    
+    async def getDashboard(self, request: DashboardFilterRequest):
+        try:
+            query = select(TrWorkspace).where(
+                TrWorkspace.userID == request.userID,
+                TrWorkspace.isActive == True
+            )
+
+            if request.startDate:
+                query = query.where(TrWorkspace.dateIn >= request.startDate)
+            if request.endDate:
+                end_date = request.endDate + timedelta(days = 1) - timedelta(microseconds=1)
+                query = query.where(TrWorkspace.dateIn <= end_date)
+
+            if request.type:
+                if request.type.lower() == "transcription":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2),
+                        not_(TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1))
+                    )
+                elif request.type.lower() == "summarization":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1),
+                        not_(TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2))
+                    )
+                elif request.type.lower() == "transcription and summarization":
+                    query = query.where(
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 1),
+                        TrWorkspace.workspaceDetail.any(TrWorkspaceDetail.toolsID == 2)
+                    )
+
+            if request.sharedStatus is not None:
+                if request.sharedStatus:
+                    query = query.where(TrWorkspace.link.is_not(None))
+                else:
+                    query = query.where(TrWorkspace.link.is_(None))
+
+            results = self.db.exec(query).all()
+
+            items: List[DashboardHistoryItem] = []
+
+            for workspace in results:
+                transcription = any(d.toolsID == 2 for d in workspace.workspaceDetail)
+                summarization = any(d.toolsID == 1 for d in workspace.workspaceDetail)
+
+                if request.search:
+                    if request.search.lower() not in (workspace.name or "").lower() and request.search.lower() not in (workspace.link or "").lower() and request.search.lower() not in (workspace.description or "").lower():
+                        continue
+
+                item = DashboardHistoryItem(
+                    workspaceID = workspace.workspaceID,
+                    title = workspace.name,
+                    description = workspace.description,
+                    createdDate = workspace.dateIn,
+                    type = (
+                        "Transcription and Summarization" if transcription and summarization else
+                        "Transcription" if transcription else
+                        "Summarization" if summarization else
+                        "-"
+                    ),
+                    isShared = workspace.link is not None,
+                    fileName = f"{workspace.workspaceID}{get_file_extension(workspace.file)}",
+                    link = workspace.link
+                )
+                items.append(item)
+
+            if request.sortBy:
+                reverse = request.sortOrder == "desc"
+                if request.sortBy == "title":
+                    items.sort(key = lambda x: (x.title or "").lower(), reverse = reverse)
+                elif request.sortBy == "description":
+                    items.sort(key = lambda x: (x.description or "").lower(), reverse = reverse)
+                elif request.sortBy == "createdDate":
+                    items.sort(key = lambda x: x.createdDate, reverse = reverse)
+                elif request.sortBy == "type":
+                    items.sort(key = lambda x: (x.type or "").lower(), reverse = reverse)
+                elif request.sortBy == "url":
+                    items.sort(key = lambda x: (x.link or "").lower(), reverse = reverse)
+
+            return Response[List[DashboardHistoryItem]](
+                statusCode = HTTPStatus.OK,
+                message = None,
+                payload = items
+            )
+
+        except Exception as e:
+            return Response(
+                statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                message = str(traceback.format_exc()),
+                payload = None
+            )
+
+    async def edit(self, request: EditRequest):
+        try:
+            workspace = self.db.exec(
+                select(TrWorkspace)
+                .where(
+                    TrWorkspace.workspaceID == request.workspaceID,
+                    TrWorkspace.isActive == True
+                )
+            ).first()
+
+            if workspace is None:
+                return Response(
+                    statusCode=HTTPStatus.NOT_FOUND,
+                    message="Workspace not found",
+                    payload=None
+                )
+
+            if workspace.userID != request.userID:
+                return Response(
+                    statusCode=HTTPStatus.FORBIDDEN,
+                    message="You are not authorized to edit this workspace",
+                    payload=None
+                )
+
+            workspace.name = request.title
+            workspace.description = request.description
+            
+            if request.shared is False:
+                workspace.link = None
+            else:
+                workspace.link = f"{self.client_url}/workspace/{workspace.workspaceID}"
+
+
+            workspace.dateUp = datetime.utcnow()
+            self.db.commit()
+
+            return Response(
+                statusCode=HTTPStatus.OK,
+                message="Workspace updated successfully",
+                payload=None
+            )
+        except Exception as e:
+            return Response(
+                statusCode=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=str(e),
+                payload=None
+            )
+            
+    async def delete(self, request: DeleteRequest):
+        try:
+            for workspaceID in request.workspaceID:
+                workspace = self.db.get(TrWorkspace, workspaceID)
+                if workspace.userID != request.userID:
+                    return Response(
+                        statusCode = HTTPStatus.FORBIDDEN,
+                        message = "You are not authorized to delete this workspace",
+                        payload = None
+                    )
+                
+                if workspace and workspace.isActive:
+                    workspace.isActive = False
+                    workspace.dateUp = datetime.utcnow()
+
+            self.db.commit()
+            
+            return Response(
+                statusCode = HTTPStatus.NO_CONTENT,
+                message = "Workspace deleted succesfully",
+                payload = None
+            )        
+        except Exception as e:
+            return Response(
+                statusCode = HTTPStatus.INTERNAL_SERVER_ERROR,
+                message = str(e),
+                payload = None
+            )
+

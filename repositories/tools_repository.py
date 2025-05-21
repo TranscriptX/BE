@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlmodel import Session, select
 from databases.tr_workspace import TrWorkspace
 from databases.tr_workspace_detail import TrWorkspaceDetail
@@ -6,18 +7,19 @@ from models.requests.summarize_request import SummarizeRequest
 from models.responses.response import Response
 from models.responses.transcript_response import TranscriptResult
 from models.responses.summarize_response import SummarizeResult
-from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
-from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
-from pipelines.language_model_pipeline import model as language_model
+# from pipelines.summarization_pipeline import model as summarization_model, tokenizer as summarization_tokenizer
+# from pipelines.transcription_pipeline import model as transcription_model, processor as transcription_processor
+# from pipelines.language_model_pipeline import model as language_model
 from http import HTTPStatus
 from utils.base64_utils import get_safe_base64
 from moviepy.editor import VideoFileClip
 from docx import Document
 from dotenv import load_dotenv
+from gradio_client import Client, handle_file
 import pdfplumber
 import uuid
-import torch
-import torchaudio
+# import torch
+# import torchaudio
 import io
 import os
 import tempfile
@@ -26,17 +28,18 @@ class ToolsRepository:
     def __init__(self, db: Session):
         load_dotenv()
         self.db = db
-        self.transcription_model = transcription_model
-        self.transcription_processor = transcription_processor
-        self.summarization_model = summarization_model
-        self.summarization_tokenizer = summarization_tokenizer
-        self.language_model = language_model
+        self.transcription_model = os.getenv("TRANSCRIPTION_MODEL")
+        # self.transcription_processor = transcription_processor
+        self.summarization_model = os.getenv("SUMMARIZATION_MODEL")
+        # self.summarization_tokenizer = summarization_tokenizer
+        # self.language_model = language_model
         self.max_tokens = 1024
         self.client_url = os.getenv("CLIENT_URL")
 
     async def transcript(self, request: TranscriptRequest, file_extension):
         try:
-            torchaudio.set_audio_backend("soundfile")
+            # torchaudio.set_audio_backend("soundfile")
+            client = Client(self.transcription_model)
 
             if file_extension == ".mp4":
                 video_bytes = get_safe_base64(request.file)
@@ -50,14 +53,30 @@ class ToolsRepository:
                 audio_stream.write_audiofile(audio_path)
                 video.close()
 
-                waveform, sample_rate = torchaudio.load(audio_path, format = "wav")
-
+                # waveform, sample_rate = torchaudio.load(audio_path, format = "wav")
+                transcription = client.predict(
+                    audio_stream = handle_file(audio_path),
+                    is_video = True,
+                    api_name = "/predict"
+                
+                )                
                 os.remove(tmp_video_path)
                 os.remove(audio_path)
             elif file_extension in [".mp3", ".wav", ".mpeg"]:
                 audio_bytes = get_safe_base64(request.file)
-                audio_stream = io.BytesIO(audio_bytes)
-                waveform, sample_rate = torchaudio.load(audio_stream)
+                # audio_stream = io.BytesIO(audio_bytes)
+                # waveform, sample_rate = torchaudio.load(audio_stream)
+                with tempfile.NamedTemporaryFile(delete = False, suffix = ".wav") as tmp_file:
+                    tmp_file.write(audio_bytes)
+                    tmp_file_path = tmp_file.name
+
+                transcription = client.predict(
+                    audio_stream = handle_file(tmp_file_path),
+                    is_video = False,
+                    api_name = "/predict"
+                )
+
+                os.remove(tmp_file_path)
             else:
                 return Response(
                     statusCode = HTTPStatus.BAD_REQUEST,
@@ -65,20 +84,20 @@ class ToolsRepository:
                     payload = None
                 )
 
-            target_sample_rate = 16000
-            if sample_rate != target_sample_rate:
-                transform = torchaudio.transforms.Resample(orig_freq = sample_rate, new_freq = target_sample_rate)
-                waveform = transform(waveform)
+            # target_sample_rate = 16000
+            # if sample_rate != target_sample_rate:
+            #     transform = torchaudio.transforms.Resample(orig_freq = sample_rate, new_freq = target_sample_rate)
+            #     waveform = transform(waveform)
 
-            input_values = self.transcription_processor(waveform.squeeze().numpy(), return_tensors = "pt", sampling_rate = target_sample_rate).input_values
+            # input_values = self.transcription_processor(waveform.squeeze().numpy(), return_tensors = "pt", sampling_rate = target_sample_rate).input_values
 
-            with torch.no_grad():
-                logits = self.transcription_model(input_values).logits
+            # with torch.no_grad():
+            #     logits = self.transcription_model(input_values).logits
 
-            predicted_ids = torch.argmax(logits, dim = -1)
-            transcription = self.transcription_processor.batch_decode(predicted_ids)[0]
-            transcription = self.language_model.restore_punctuation(transcription)
-            
+            # predicted_ids = torch.argmax(logits, dim = -1)
+            # transcription = self.transcription_processor.batch_decode(predicted_ids)[0]
+            # transcription = self.language_model.restore_punctuation(transcription)
+
             workspace_id = str(uuid.uuid4())
 
             workspace = TrWorkspace(
@@ -105,7 +124,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = TranscriptResult(
-                    result = transcription
+                    result = transcription,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:
@@ -120,7 +140,10 @@ class ToolsRepository:
             if request.workspaceID is not None:
                 text = self.db.exec(
                     select(TrWorkspaceDetail.result)
-                    .where(TrWorkspaceDetail.workspaceID == request.workspaceID)
+                    .where(
+                        TrWorkspaceDetail.workspaceID == request.workspaceID, 
+                        TrWorkspaceDetail.isActive == True
+                    )
                 ).first()
 
                 if text is None:
@@ -131,6 +154,18 @@ class ToolsRepository:
                     )
                 
                 workspace_id = request.workspaceID
+
+                workspace = self.db.exec(
+                    select(TrWorkspace)
+                    .where(
+                        TrWorkspace.workspaceID == workspace_id,
+                        TrWorkspace.isActive == True
+                    )
+                ).first()
+
+                workspace.name = request.name
+                workspace.description = request.description
+                workspace.dateUp = datetime.utcnow()
             elif request.file is not None:
                 file_data = request.file.split(",")[-1]
                 file_bytes = get_safe_base64(file_data)
@@ -172,42 +207,47 @@ class ToolsRepository:
                     message = "Invalid model state",
                     payload = None
                 )
+            
+            # chunk_size = self.max_tokens * 4
+            # overlap = chunk_size // 4 
+            # step = chunk_size - overlap
+            # chunks = [text[i:i + chunk_size] for i in range(0, len(text), step)]
 
-            chunk_size = self.max_tokens * 4
-            overlap = chunk_size // 4 
-            step = chunk_size - overlap
-            chunks = [text[i:i + chunk_size] for i in range(0, len(text), step)]
+            # summaries = []
+            # for chunk in chunks:
+            #     inputs = self.summarization_tokenizer(chunk, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+            #     with torch.no_grad():
+            #         summary_ids = self.summarization_model.generate(
+            #             **inputs,
+            #             max_length = 1500,
+            #             length_penalty = 2.0,
+            #             num_beams = 4,
+            #             early_stopping = True
+            #         )
+            #     summary = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            #     summaries.append(summary)
 
-            summaries = []
-            for chunk in chunks:
-                inputs = self.summarization_tokenizer(chunk, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
-                with torch.no_grad():
-                    summary_ids = self.summarization_model.generate(
-                        **inputs,
-                        max_length = 1500,
-                        length_penalty = 2.0,
-                        num_beams = 4,
-                        early_stopping = True
-                    )
-                summary = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
-                summaries.append(summary)
-
-            final_text = " ".join(summaries)
-            summarization = final_text
-            if len(final_text) > self.max_tokens:
-                inputs = self.summarization_tokenizer(final_text, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
-                with torch.no_grad():
-                    summary_ids = self.summarization_model.generate(
-                        **inputs,
-                        min_length = 300,
-                        max_length = 1500,
-                        length_penalty = 2.0,
-                        num_beams = 4,
-                        early_stopping = True
-                    )
-                summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
-            else:
-                summarization = final_text  
+            # final_text = " ".join(summaries)
+            # summarization = final_text
+            # if len(final_text) > self.max_tokens:
+            #     inputs = self.summarization_tokenizer(final_text, return_tensors = "pt", truncation = True, max_length = 1024, padding = True)
+            #     with torch.no_grad():
+            #         summary_ids = self.summarization_model.generate(
+            #             **inputs,
+            #             min_length = 300,
+            #             max_length = 1500,
+            #             length_penalty = 2.0,
+            #             num_beams = 4,
+            #             early_stopping = True
+            #         )
+            #     summarization = self.summarization_tokenizer.decode(summary_ids[0], skip_special_tokens = True)
+            # else:
+            #     summarization = final_text  
+            client = Client(self.summarization_model)
+            summarization = client.predict(
+                text = text,
+                api_name = "/predict"
+            )
 
             workspace_detail = TrWorkspaceDetail(
                 workspaceDetailID = str(uuid.uuid4()),
@@ -224,7 +264,8 @@ class ToolsRepository:
                 statusCode = HTTPStatus.CREATED,
                 message = None,
                 payload = SummarizeResult(
-                    result = summarization
+                    result = summarization,
+                    workspaceID = workspace_id
                 )
             )
         except Exception as e:

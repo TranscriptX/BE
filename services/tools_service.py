@@ -18,6 +18,13 @@ class ToolsService:
 
     async def transcript(self, request: TranscriptRequest):
         try:
+            if request.userID is None or request.file is None:
+                return Response(
+                    statusCode = HTTPStatus.BAD_REQUEST,
+                    message = "Invalid model state",
+                    payload = None 
+                )
+            
             file_size = get_file_size(request.file)
             if file_size >= (self.max_file_size * 1024 * 1024):
                 return Response(
@@ -47,6 +54,13 @@ class ToolsService:
     
     async def summarize(self, request: SummarizeRequest):
         try:
+            if request.userID is None:
+                return Response(
+                    statusCode = HTTPStatus.BAD_REQUEST,
+                    message = "Invalid model state",
+                    payload = None 
+                )
+
             if request.workspaceID is not None:
                 return await self.tools_repository.summarize(
                     request = request,
