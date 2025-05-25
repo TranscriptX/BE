@@ -1,6 +1,7 @@
 import os
 import smtplib
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from dotenv import load_dotenv
 import traceback
 
@@ -19,6 +20,9 @@ def send_email(to_email: str, subject: str, body: str):
         msg["Subject"] = subject
         msg["From"] = SMTP_USERNAME
         msg["To"] = to_email
+        msg["Date"] = formatdate(localtime = True)
+        msg["Message-ID"] = make_msgid(domain = SMTP_USERNAME.split("@")[-1])
+        msg["Reply-To"] = f"TranscriptX Admin <admin@{SMTP_USERNAME.split('@')[-1]}"        
         msg.set_content(body)
 
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
@@ -34,11 +38,39 @@ def send_email(to_email: str, subject: str, body: str):
 
 def send_verification_email(email: str, token: str):
     subject = "Email Verification - TranscriptX"
-    body = f"Hello,\n\nPlease verify your email by clicking link below:\n\n{SERVER_URL}/api/auth/verify-email?token={token}\n\nThank you!"
+    body = f"""\
+    Hi,
+
+    Thank you for joining TranscriptX — we're excited to have you on board!
+
+    To activate your account, please confirm your email address by clicking the link below:
+    https://{SERVER_URL}/api/auth/verify-email?token={token}
+
+    If you didn’t sign up for a TranscriptX account, no further action is required — you can safely disregard this email.
+
+    If you have any questions or need help, feel free to reach out to our support team.
+
+    Best regards,
+    The TranscriptX Team
+    transcriptx.my.id
+        """
     return send_email(email, subject, body)
 
 
 def send_reset_password_email(email: str, token: str):
     subject = "Reset Password - TranscriptX"
-    body = f"Hello,\n\nUse the following token to reset your password:\n\n{token}\n\nThank you!"
+    body = f"""\
+Hi there,
+
+We received a request to reset the password for your TranscriptX account.
+
+To proceed, please use the token below:
+
+{token}
+
+If you did not request a password reset, please ignore this message or contact our support team.
+
+Best regards,  
+The TranscriptX Team
+    """
     return send_email(email, subject, body)
