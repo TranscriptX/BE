@@ -27,6 +27,6 @@ Steps to run this project locally:
 - Create a virtual environment and switch to that environment. To create a virtual environment, follow these steps:
   - `python -m venv venv`
   - `venv\Scripts\activate`
-  - `pip install fastapi uvicorn sqlmodel dotenv pymysql soundfile moviepy==1.0.3 pdfplumber python-docx bcrypt passlib jose pydantic[email] python-jose==3.4.0 xhtml2pdf gradio_client`
+  - `pip install fastapi uvicorn sqlmodel dotenv pymysql moviepy==1.0.3 pdfplumber python-docx bcrypt passlib jose pydantic[email] python-jose==3.4.0 xhtml2pdf gradio_client`
 - Run the app locally using `uvicorn main:app --reload` in the terminal. If you run the project for the first time, it will automatically create migrations.
 - If you run the project for the first time, after running the application, create a new terminal and fill the database with initial value with `python -m databases.seed_database`.
